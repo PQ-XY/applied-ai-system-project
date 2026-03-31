@@ -93,7 +93,9 @@ class Owner:
         pass
 
     def remove_pet(self, pet_id: str) -> None:
-        """Remove a pet from the owner's collection"""
+        """
+        Removes a pet from the owner by its pet_id.
+        """
         pass
 
     def get_pets(self) -> List[Pet]:
