@@ -6,6 +6,18 @@
 
 - Briefly describe your initial UML design.
 - What classes did you include, and what responsibilities did you assign to each?
+    Owner — manages pets and their scheduler, stores personal contact info
+    Pet — represents individual pets with species, breed, health info; records activities
+    Scheduler — the algorithmic core that manages, prioritizes, and organizes all tasks
+    Task — individual activities (feeding, walks, medications, appointments, etc.) with priority levels
+    TaskType — enum defining the six main task categories
+
+    Relationships:
+
+        Owner owns multiple Pets (1:*)
+        Owner has one Scheduler (1:1)
+        Scheduler manages multiple Tasks (1:*)
+        Tasks are assigned to specific Pets (*:1)
 
 **b. Design changes**
 

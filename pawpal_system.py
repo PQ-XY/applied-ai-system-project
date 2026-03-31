@@ -60,7 +60,8 @@ class Task:
 
     def mark_complete(self) -> None:
         """Mark the task as completed"""
-        pass
+        self.completed = True
+        self.completed_time = datetime.now()
 
     def update_priority(self, new_priority: int) -> None:
         """Update the task's priority level"""
@@ -116,7 +117,7 @@ class Scheduler:
 
     def add_task(self, task: Task) -> None:
         """Add a new task to the scheduler"""
-        pass
+        self.tasks.append(task)
 
     def remove_task(self, task_id: str) -> None:
         """Remove a task from the scheduler"""
