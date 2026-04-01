@@ -87,3 +87,42 @@ if conflicts:
 # Complete recurring task (automatically creates tomorrow's)
 task_1.mark_complete(scheduler)
 ```
+
+## Testing PawPal+
+
+Comprehensive test coverage ensures the scheduler works correctly across all key features.
+
+### Run Tests
+
+```bash
+python -m pytest tests/test_pawpal.py -v
+```
+
+### Test Coverage
+
+The test suite includes **24 test cases** across three critical areas:
+
+**1. Sorting Correctness (3 tests)**
+- Tasks are returned in chronological order
+- Empty schedules and single tasks handled correctly
+- Tasks added out of order are properly sorted
+
+**2. Recurrence Logic (4 tests)**
+- Non-recurring tasks don't create next occurrences
+- Daily tasks generate next occurrence exactly +1 day
+- Weekly tasks generate next occurrence exactly +7 days
+- New recurring tasks inherit all properties from the original
+
+**3. Conflict Detection (7 tests)**
+- No false positives (empty schedules, single tasks, completed tasks)
+- Same-pet conflicts detected when a pet has multiple tasks at the same time
+- Owner conflicts detected when different pets need attention simultaneously
+- Both conflict types reported together when applicable
+- Conflicts detected independently across multiple time slots
+
+**4. Task Management (6 tests)**
+- Task addition and scheduler tracking
+- Multiple tasks for same and different pets
+- Task-to-pet associations
+
+**All tests passing** ✓
