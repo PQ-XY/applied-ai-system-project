@@ -57,11 +57,15 @@ class Task:
     description: str
     completed: bool = False
     completed_time: datetime = field(default=None)
+    recurrence: str = field(default=None)  # "daily", "weekly", or None
 
-    def mark_complete(self) -> None:
-        """Mark the task as completed"""
+    def mark_complete(self, scheduler: 'Scheduler' = None) -> None:
+        """Mark the task as completed and create next occurrence if recurring"""
         self.completed = True
         self.completed_time = datetime.now()
+        
+        if self.recurrence and scheduler:
+            scheduler.create_next_occurrence(self)
 
     def update_priority(self, new_priority: int) -> None:
         """Update the task's priority level"""
@@ -120,6 +124,103 @@ class Scheduler:
     def add_task(self, task: Task) -> None:
         """Add a new task to the scheduler"""
         self.tasks.append(task)
+
+    def sort_by_time(self) -> List[Task]:
+        """Sort all active tasks by due_time in chronological order"""
+        return sorted(self.tasks, key=lambda task: task.due_time)
+
+    def filter_tasks(self, pet_name: str = None, completed: bool = None) -> List[Task]:
+        """Filter tasks by pet name and/or completion status"""
+        filtered = self.tasks
+        
+        if pet_name is not None:
+            filtered = [task for task in filtered if task.pet.name.lower() == pet_name.lower()]
+        
+        if completed is not None:
+            filtered = [task for task in filtered if task.completed == completed]
+        
+        return filtered
+
+    def create_next_occurrence(self, task: Task) -> None:
+        """Create a new task for the next occurrence of a recurring task"""
+        from datetime import timedelta
+        
+        # Calculate the next due time based on recurrence pattern
+        if task.recurrence == "daily":
+            next_time = task.due_time + timedelta(days=1)
+        elif task.recurrence == "weekly":
+            next_time = task.due_time + timedelta(weeks=1)
+        else:
+            return  # No valid recurrence pattern
+        
+        # Generate a new task ID (append a counter or timestamp)
+        import time
+        next_task_id = f"{task.task_id}__{int(time.time())}"
+        
+        # Create the new task with the same properties
+        next_task = Task(
+            task_id=next_task_id,
+            task_type=task.task_type,
+            pet=task.pet,
+            due_time=next_time,
+            priority=task.priority,
+            description=task.description,
+            completed=False,
+            recurrence=task.recurrence
+        )
+        
+        # Add the new task to the scheduler
+        self.add_task(next_task)
+
+    def detect_conflicts(self) -> List[str]:
+        """
+        Detect scheduling conflicts and return warning messages.
+        Checks for:
+        1. Same pet with multiple tasks at the same time (impossible)
+        2. Different pets with tasks at the same time (owner can't do both simultaneously)
+        Returns a list of warning messages (empty if no conflicts).
+        """
+        warnings = []
+        
+        # Only check active (incomplete) tasks
+        active_tasks = [task for task in self.tasks if not task.completed]
+        
+        # Group tasks by their due_time
+        time_groups = {}
+        for task in active_tasks:
+            time_key = task.due_time
+            if time_key not in time_groups:
+                time_groups[time_key] = []
+            time_groups[time_key].append(task)
+        
+        # Check for conflicts within each time slot
+        for due_time, tasks_at_time in time_groups.items():
+            if len(tasks_at_time) > 1:
+                # Check for same-pet conflicts (highest priority warning)
+                pets_at_time = {}
+                for task in tasks_at_time:
+                    if task.pet.name not in pets_at_time:
+                        pets_at_time[task.pet.name] = []
+                    pets_at_time[task.pet.name].append(task)
+                
+                # Warning: Same pet with multiple tasks
+                for pet_name, pet_tasks in pets_at_time.items():
+                    if len(pet_tasks) > 1:
+                        time_str = due_time.strftime('%Y-%m-%d %H:%M')
+                        task_desc = ", ".join([t.task_type.value for t in pet_tasks])
+                        warnings.append(
+                            f"⚠️ CONFLICT: {pet_name} has multiple tasks at {time_str}: {task_desc}"
+                        )
+                
+                # Warning: Multiple pets (owner can't do both)
+                if len(pets_at_time) > 1:
+                    time_str = due_time.strftime('%Y-%m-%d %H:%M')
+                    pet_list = ", ".join(pets_at_time.keys())
+                    warnings.append(
+                        f"⚠️ OWNER CONFLICT: Multiple pets need attention at {time_str}: {pet_list}"
+                    )
+        
+        return warnings
 
     def remove_task(self, task_id: str) -> None:
         """Remove a task from the scheduler"""

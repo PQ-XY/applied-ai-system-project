@@ -41,3 +41,49 @@ pip install -r requirements.txt
 5. Add tests to verify key behaviors.
 6. Connect your logic to the Streamlit UI in `app.py`.
 7. Refine UML so it matches what you actually built.
+
+## Smarter Scheduling Features
+
+PawPal+ includes intelligent scheduling capabilities to help organize and manage pet care tasks efficiently:
+
+### ✓ Task Sorting by Time
+- `Scheduler.sort_by_time()` — Organizes all active tasks in chronological order
+- Essential for viewing what needs to happen and when
+
+### ✓ Flexible Task Filtering  
+- `Scheduler.filter_tasks(pet_name=None, completed=True/False)` — Filter by pet or completion status
+- Quickly find tasks for a specific pet or see what's done vs. pending
+
+### ✓ Recurring Tasks (Daily & Weekly)
+- Tasks with `recurrence="daily"` or `recurrence="weekly"` automatically regenerate the next occurrence when marked complete
+- Eliminates manual task re-creation for habits like daily feeding and medication
+
+### ✓ Lightweight Conflict Detection
+- `Scheduler.detect_conflicts()` — Returns warning messages for impossible schedules
+- Detects same-pet conflicts (e.g., Max can't have two walks at the same time)
+- Detects owner conflicts (e.g., owner can't walk Max and Luna simultaneously)
+- Uses simple exact-time matching for O(n) performance
+
+### Example Usage
+
+```python
+# Create a scheduler
+scheduler = Scheduler(scheduler_id="sched_001", owner=owner)
+
+# Add tasks...
+task_1 = Task(task_id="t1", ..., recurrence="daily")
+scheduler.add_task(task_1)
+
+# Sort and filter
+sorted_tasks = scheduler.sort_by_time()
+max_tasks = scheduler.filter_tasks(pet_name="Max", completed=False)
+
+# Check for conflicts
+conflicts = scheduler.detect_conflicts()
+if conflicts:
+    for warning in conflicts:
+        print(warning)
+
+# Complete recurring task (automatically creates tomorrow's)
+task_1.mark_complete(scheduler)
+```
