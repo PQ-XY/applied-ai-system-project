@@ -20,6 +20,7 @@ import google.generativeai as genai
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field, ValidationError
 
+from ai_validator import PlanValidator
 from knowledge_retriever import KnowledgeRetriever
 
 load_dotenv()
@@ -74,6 +75,7 @@ class CatTaskPlanningAgent:
         model: str = DEFAULT_MODEL,
     ):
         self.retriever = knowledge_retriever or KnowledgeRetriever()
+        self.validator = PlanValidator()
         self.model = model
         api_key = os.getenv("GOOGLE_API_KEY")
         if api_key:
@@ -109,12 +111,25 @@ class CatTaskPlanningAgent:
             raw_response = self._call_gemini(profile, knowledge, frequencies)
             plan = self._parse_plan(raw_response)
             logger.info("Gemini generated a valid plan with %d tasks", len(plan.suggested_tasks))
+            plan_payload = plan.model_dump()
+            validation = self.validator.validate_plan(
+                profile=profile.__dict__,
+                plan=plan_payload,
+                knowledge=knowledge,
+            )
+
             return {
                 "source": "gemini",
                 "profile": profile.__dict__,
                 "knowledge": knowledge,
                 "frequency_recommendations": frequencies,
-                "plan": plan.model_dump(),
+                "plan": plan_payload,
+                "validation": {
+                    "passed": validation.passed,
+                    "score": validation.score,
+                    "errors": validation.errors,
+                    "warnings": validation.warnings,
+                },
             }
         except (ValidationError, json.JSONDecodeError, KeyError, ValueError) as exc:
             logger.exception("Gemini response could not be validated; using fallback plan")
@@ -226,13 +241,26 @@ class CatTaskPlanningAgent:
             ],
         )
 
+        plan_payload = plan.model_dump()
+        validation = self.validator.validate_plan(
+            profile=profile.__dict__,
+            plan=plan_payload,
+            knowledge=knowledge,
+        )
+
         return {
             "source": "fallback",
             "profile": profile.__dict__,
             "knowledge": knowledge,
             "frequency_recommendations": frequencies,
-            "plan": plan.model_dump(),
+            "plan": plan_payload,
             "warnings": warnings,
+            "validation": {
+                "passed": validation.passed,
+                "score": validation.score,
+                "errors": validation.errors,
+                "warnings": validation.warnings,
+            },
         }
 
     def _build_summary(self, profile: CatProfile, knowledge: Dict[str, Any]) -> str:
