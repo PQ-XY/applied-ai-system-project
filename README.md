@@ -34,6 +34,7 @@ A busy pet owner manages multiple pets with different care needs (feeding, walks
 
 - Python 3.8+
 - pip (Python package manager)
+- Google Generative AI API key for Gemini (optional, but required for live AI generation)
 
 ### Setup Instructions
 
@@ -50,17 +51,31 @@ A busy pet owner manages multiple pets with different care needs (feeding, walks
    .venv\Scripts\activate             # Windows
    ```
 
-3. **Install dependencies**
+3. **Set up environment variables**
    ```bash
-   pip install -r requirements.txt
+   cp .env.example .env
+   ```
+   Then open `.env` and add your Google Generative AI API key:
+   ```bash
+   GOOGLE_API_KEY=your_key_here
    ```
 
-4. **Verify installation**
-   ```bash
-   python -m pytest tests/test_pawpal.py -v  # Run tests
-   ```
+4. **Install dependencies**
+    ```bash
+    pip install -r requirements.txt
+    ```
 
----
+5. **Verify installation**
+    ```bash
+    python -m pytest tests/test_pawpal.py -v  # Run tests
+    ```
+
+### Environment Variables
+
+The AI features use the following environment variables:
+
+- `GOOGLE_API_KEY` — required for Gemini-powered task planning
+- `GEMINI_MODEL` — optional Gemini model override (defaults to `gemini-2.0-flash`)
 
 ## Quick Start
 
