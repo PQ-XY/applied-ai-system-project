@@ -168,7 +168,7 @@ streamlit run app.py
 ## Environment Variables
 
 - `GOOGLE_API_KEY`: Required for Gemini API calls
-- `GEMINI_MODEL`: Optional model override (default: `gemini-2.0-flash`)
+- `GEMINI_MODEL`: Optional model override (default: `gemini-2.5-flash`)
 
 If `GOOGLE_API_KEY` is missing, the app uses deterministic fallback planning so the project still runs.
 

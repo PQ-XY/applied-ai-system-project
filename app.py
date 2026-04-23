@@ -1,4 +1,6 @@
 import streamlit as st
+import json
+from pathlib import Path
 from datetime import datetime, timedelta
 from pawpal_system import Owner, Pet, Scheduler, Task, TaskType
 from ai_agent import CatTaskPlanningAgent, CatProfile
@@ -49,15 +51,36 @@ def parse_suggested_time(suggested_time: str):
 
     return datetime.strptime("10:00", "%H:%M").time()
 
+
+def load_breed_options():
+    """Load cat breed names from the knowledge base for dropdowns."""
+    breeds_file = Path("knowledge_base") / "breeds.json"
+    try:
+        with open(breeds_file, "r") as f:
+            data = json.load(f)
+        breeds = data.get("breeds", {})
+        return sorted([entry.get("name", key.replace("_", " ").title()) for key, entry in breeds.items()])
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        # Safe fallback so cat creation is never blocked by KB file issues.
+        return [
+            "Abyssinian",
+            "Bengal",
+            "Domestic Shorthair",
+            "Maine Coon",
+            "Persian",
+            "Ragdoll",
+            "Siamese",
+        ]
+
 st.set_page_config(page_title="PawPal+", page_icon="🐾", layout="wide")
 
 st.title("🐾 PawPal+")
 
 st.markdown(
     """
-Welcome to PawPal+, your pet care management system.
+Welcome to PawPal+, your cat care management system.
 
-This app helps you plan and organize your pet's daily routine with intelligent task scheduling.
+This app helps you plan and organize your cat's daily routine with intelligent task scheduling.
 """
 )
 
@@ -114,34 +137,33 @@ if st.session_state.owner:
 st.divider()
 
 # Pet Management
-st.subheader("🐕 Manage Pets")
+st.subheader("🐈 Manage Cats")
 
 if st.session_state.owner:
-    col1, col2, col3, col4 = st.columns(4)
+    breed_options = load_breed_options()
+    col1, col2, col3 = st.columns(3)
     
     with col1:
-        pet_name = st.text_input("Pet name", value="Mochi")
+        pet_name = st.text_input("Cat name", value="Mochi")
     with col2:
-        pet_species = st.selectbox("Species", ["Dog", "Cat", "Rabbit", "Bird", "Other"])
+        pet_breed = st.selectbox("Breed", options=breed_options, index=0)
     with col3:
-        pet_breed = st.text_input("Breed", value="Labrador")
-    with col4:
         pet_age = st.number_input("Age (years)", min_value=0, max_value=30, value=3)
     
     pet_health = st.text_area("Health info", value="Healthy, up to date on vaccinations")
     
-    if st.button("Add Pet"):
-        # Check if pet name already exists
+    if st.button("Add Cat"):
+        # Check if cat name already exists
         existing_names = [p.name.lower() for p in st.session_state.owner.pets]
         if pet_name.lower() in existing_names:
-            st.error(f"❌ A pet named '{pet_name}' already exists! Choose a different name.")
+            st.error(f"❌ A cat named '{pet_name}' already exists! Choose a different name.")
         else:
-            # Create new pet with unique ID
+            # Create new cat with unique ID
             st.session_state.pet_counter += 1
             pet = Pet(
                 pet_id=f"pet_{st.session_state.pet_counter:03d}",
                 name=pet_name,
-                species=pet_species,
+                species="Cat",
                 breed=pet_breed,
                 age=pet_age,
                 health_info=pet_health,
@@ -151,16 +173,16 @@ if st.session_state.owner:
             # Use the add_pet() method with duplicate checking
             if st.session_state.owner.add_pet(pet):
                 st.session_state.pets = st.session_state.owner.pets
-                st.success(f"✅ Pet '{pet_name}' added successfully!")
+                st.success(f"✅ Cat '{pet_name}' added successfully!")
             else:
-                st.error(f"❌ Could not add pet '{pet_name}'. A pet with this ID or name may already exist.")
+                st.error(f"❌ Could not add cat '{pet_name}'. A cat with this ID or name may already exist.")
     
     if st.session_state.pets:
-        st.markdown("### Current Pets")
+        st.markdown("### Current Cats")
         for pet in st.session_state.pets:
-            st.info(f"🐾 **{pet.name}** ({pet.species}, {pet.breed}, {pet.age} years) - {pet.health_info}")
+            st.info(f"🐾 **{pet.name}** ({pet.breed}, {pet.age} years) - {pet.health_info}")
 else:
-    st.warning("⚠️ Please initialize an Owner first.")
+    st.warning("⚠️ Please initialize an owner first.")
 
 st.divider()
 
@@ -290,16 +312,16 @@ if st.session_state.owner and st.session_state.pets:
     
     with col1:
         selected_pet = st.selectbox(
-            "Select pet",
+            "Select cat",
             options=st.session_state.pets,
-            format_func=lambda p: f"{p.name} ({p.species})"
+            format_func=lambda p: f"{p.name} ({p.breed})"
         )
         task_type = st.selectbox(
             "Task type",
             options=[t.value for t in TaskType],
             format_func=lambda x: x.upper()
         )
-        task_description = st.text_input("Task description", value="Feed pet")
+        task_description = st.text_input("Task description", value="Feed cat")
     
     with col2:
         task_time = st.time_input("Time", value=datetime.now().time())
@@ -333,7 +355,7 @@ if st.session_state.owner and st.session_state.pets:
             task_data.append({
                 "Status": "✅ Done" if task.completed else "⏳ Pending",
                 "Time": task.due_time.strftime('%H:%M'),
-                "Pet": task.pet.name,
+                "Cat": task.pet.name,
                 "Type": task.task_type.value.capitalize(),
                 "Description": task.description,
                 "Priority": "⭐" * task.priority
@@ -360,7 +382,7 @@ if st.session_state.owner and st.session_state.pets:
         
         with col1:
             filter_pet = st.selectbox(
-                "Filter by Pet (select 'All' to show all)",
+                "Filter by Cat (select 'All' to show all)",
                 options=["All"] + [p.name for p in st.session_state.pets],
                 key="filter_pet_select"
             )
@@ -433,7 +455,7 @@ if st.session_state.owner and st.session_state.pets:
         st.info("No tasks scheduled yet. Add one above.")
 
 elif st.session_state.owner:
-    st.warning("⚠️ Please add at least one pet before scheduling tasks.")
+    st.warning("⚠️ Please add at least one cat before scheduling tasks.")
 
 else:
-    st.warning("⚠️ Please initialize an Owner first.")
+    st.warning("⚠️ Please initialize an owner first.")

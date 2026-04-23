@@ -12,8 +12,9 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import google.generativeai as genai
@@ -31,7 +32,7 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 
-DEFAULT_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+DEFAULT_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
 
 class SuggestedTask(BaseModel):
@@ -136,6 +137,11 @@ class CatTaskPlanningAgent:
             fallback = self._build_fallback_plan(profile, knowledge, frequencies)
             fallback["warnings"].append(f"Gemini output validation failed: {exc}")
             return fallback
+        except Exception as exc:
+            logger.exception("Gemini API call failed; using fallback plan")
+            fallback = self._build_fallback_plan(profile, knowledge, frequencies)
+            fallback["warnings"].append(f"Gemini API failure: {exc}")
+            return fallback
 
     def _has_api_key(self) -> bool:
         return bool(os.getenv("GOOGLE_API_KEY"))
@@ -150,18 +156,88 @@ class CatTaskPlanningAgent:
         prompt = self._build_prompt(profile, knowledge, frequencies)
         logger.info("Sending planning prompt to Gemini (%s)", self.model)
 
+        text = self._request_gemini(prompt)
+        if not text or not text.strip():
+            raise ValueError("Gemini returned an empty response body.")
+
+        try:
+            json_text = self._extract_json_text(text)
+            logger.debug("Gemini raw response: %s", text)
+            return json.loads(json_text)
+        except (json.JSONDecodeError, ValueError):
+            logger.warning("Initial Gemini parse failed; retrying with stricter JSON-only prompt")
+            retry_prompt = (
+                prompt
+                + "\n\nIMPORTANT: Return only valid JSON. Do not add markdown fences, notes, or extra text."
+            )
+            retry_text = self._request_gemini(retry_prompt)
+            if not retry_text or not retry_text.strip():
+                raise ValueError("Gemini retry returned an empty response body.")
+            json_text = self._extract_json_text(retry_text)
+            logger.debug("Gemini retry raw response: %s", retry_text)
+            return json.loads(json_text)
+
+    def _request_gemini(self, prompt: str) -> str:
+        """Send a single request to Gemini and return response text."""
         model = genai.GenerativeModel(self.model)
         response = model.generate_content(
             prompt,
             generation_config=genai.types.GenerationConfig(
                 temperature=0.2,
                 max_output_tokens=1200,
+                response_mime_type="application/json",
             ),
         )
+        return self._response_text(response)
 
-        text = response.text
-        logger.debug("Gemini raw response: %s", text)
-        return json.loads(text)
+    def _response_text(self, response: Any) -> str:
+        """Return text from Gemini response across SDK response shapes."""
+        text = getattr(response, "text", None)
+        if text:
+            return text
+
+        candidates = getattr(response, "candidates", None)
+        if not candidates:
+            return ""
+
+        chunks: List[str] = []
+        for candidate in candidates:
+            content = getattr(candidate, "content", None)
+            if not content:
+                continue
+            parts = getattr(content, "parts", None) or []
+            for part in parts:
+                part_text = getattr(part, "text", None)
+                if part_text:
+                    chunks.append(part_text)
+
+        return "\n".join(chunks)
+
+    def _extract_json_text(self, text: str) -> str:
+        """Extract JSON object text from raw model output.
+
+        Handles common cases where the model wraps JSON in markdown fences
+        or adds prose before/after the object.
+        """
+        cleaned = text.strip()
+
+        # Remove markdown code fences if present.
+        cleaned = re.sub(r"^```(?:json)?", "", cleaned, flags=re.IGNORECASE).strip()
+        cleaned = re.sub(r"```$", "", cleaned).strip()
+
+        # If output is already a pure JSON object/array, return it as-is.
+        if (cleaned.startswith("{") and cleaned.endswith("}")) or (
+            cleaned.startswith("[") and cleaned.endswith("]")
+        ):
+            return cleaned
+
+        # Best-effort: grab first JSON object bounds.
+        start = cleaned.find("{")
+        end = cleaned.rfind("}")
+        if start != -1 and end != -1 and end > start:
+            return cleaned[start : end + 1]
+
+        raise ValueError("Gemini response did not contain a JSON object.")
 
     def _build_prompt(
         self,
@@ -170,6 +246,12 @@ class CatTaskPlanningAgent:
         frequencies: Dict[str, str],
     ) -> str:
         """Build a strict prompt that asks for JSON only."""
+        condensed_context = {
+            "recommended_tasks": knowledge.get("recommended_tasks", []),
+            "key_guidelines": knowledge.get("key_guidelines", [])[:15],
+            "health_priorities": knowledge.get("health_priorities", []),
+        }
+
         return (
             "You are a cat care planning assistant for the PawPal+ app. "
             "Use the retrieved knowledge to generate a safe, practical care plan. "
@@ -184,7 +266,7 @@ class CatTaskPlanningAgent:
             f"- Age: {profile.age_years}\n"
             f"- Health conditions: {profile.health_conditions or []}\n"
             f"- Preferences: {profile.preferences or []}\n\n"
-            f"Retrieved knowledge: {json.dumps(knowledge, indent=2, default=str)}\n\n"
+            f"Retrieved context: {json.dumps(condensed_context, indent=2, default=str)}\n\n"
             f"Frequency recommendations: {json.dumps(frequencies, indent=2, default=str)}\n\n"
             "Rules:\n"
             "- Focus only on cat care tasks that are relevant to the retrieved knowledge.\n"
