@@ -1,6 +1,53 @@
 import streamlit as st
 from datetime import datetime, timedelta
 from pawpal_system import Owner, Pet, Scheduler, Task, TaskType
+from ai_agent import CatTaskPlanningAgent, CatProfile
+
+
+def map_ai_task_to_tasktype(task_type: str) -> TaskType:
+    """Map free-form AI task labels to the app's TaskType enum."""
+    label = task_type.lower()
+
+    if "feed" in label:
+        return TaskType.FEEDING
+    if "medication" in label or "injection" in label:
+        return TaskType.MEDICATION
+    if "groom" in label or "eye" in label or "dental" in label:
+        return TaskType.GROOMING
+    if "play" in label or "exercise" in label or "training" in label:
+        return TaskType.TRAINING
+    return TaskType.APPOINTMENT
+
+
+def recurrence_from_frequency(frequency: str):
+    """Infer recurrence from model-provided frequency text."""
+    freq = frequency.lower()
+    if "daily" in freq or "twice" in freq or "morning" in freq or "evening" in freq:
+        return "daily"
+    if "weekly" in freq:
+        return "weekly"
+    return None
+
+
+def parse_suggested_time(suggested_time: str):
+    """Best-effort parsing of suggested text times into a concrete time value."""
+    lower = suggested_time.lower()
+    if "morning" in lower:
+        return datetime.strptime("09:00", "%H:%M").time()
+    if "midday" in lower or "noon" in lower:
+        return datetime.strptime("12:00", "%H:%M").time()
+    if "afternoon" in lower:
+        return datetime.strptime("15:00", "%H:%M").time()
+    if "evening" in lower or "night" in lower:
+        return datetime.strptime("18:00", "%H:%M").time()
+
+    for fmt in ["%H:%M", "%I:%M %p", "%I %p"]:
+        try:
+            return datetime.strptime(suggested_time.strip(), fmt).time()
+        except ValueError:
+            continue
+
+    return datetime.strptime("10:00", "%H:%M").time()
 
 st.set_page_config(page_title="PawPal+", page_icon="🐾", layout="wide")
 
@@ -28,6 +75,12 @@ if "pets" not in st.session_state:
 
 if "pet_counter" not in st.session_state:
     st.session_state.pet_counter = 0
+
+if "ai_agent" not in st.session_state:
+    st.session_state.ai_agent = None
+
+if "ai_plan" not in st.session_state:
+    st.session_state.ai_plan = None
 
 # Owner Setup
 st.subheader("👤 Owner Information")
@@ -108,6 +161,122 @@ if st.session_state.owner:
             st.info(f"🐾 **{pet.name}** ({pet.species}, {pet.breed}, {pet.age} years) - {pet.health_info}")
 else:
     st.warning("⚠️ Please initialize an Owner first.")
+
+st.divider()
+
+# AI Planner
+st.subheader("🤖 AI Cat Care Planner")
+
+if st.session_state.owner and st.session_state.pets:
+    st.caption("Generate an AI task plan using cat profile + retrieved care guidelines.")
+
+    ai_col1, ai_col2 = st.columns(2)
+
+    with ai_col1:
+        ai_pet = st.selectbox(
+            "Select cat for AI planning",
+            options=st.session_state.pets,
+            format_func=lambda p: f"{p.name} ({p.breed})",
+            key="ai_pet_select",
+        )
+        ai_conditions = st.text_input(
+            "Health conditions (comma-separated)",
+            value="",
+            help="Example: asthma, chronic kidney disease",
+        )
+
+    with ai_col2:
+        ai_preferences = st.text_area(
+            "Owner preferences (optional)",
+            value="Keep routines simple, prioritize evenings",
+            help="Example: avoid mornings, short play sessions, strict medication times",
+        )
+
+    if st.button("Generate AI Plan"):
+        try:
+            if st.session_state.ai_agent is None:
+                st.session_state.ai_agent = CatTaskPlanningAgent()
+
+            condition_list = [c.strip() for c in ai_conditions.split(",") if c.strip()]
+            preference_list = [p.strip() for p in ai_preferences.split(",") if p.strip()]
+
+            profile = CatProfile(
+                name=ai_pet.name,
+                breed=ai_pet.breed,
+                age_years=int(ai_pet.age),
+                health_conditions=condition_list,
+                preferences=preference_list,
+            )
+
+            st.session_state.ai_plan = st.session_state.ai_agent.create_plan(profile)
+            st.success("✅ AI plan generated successfully.")
+        except Exception as e:
+            st.error(f"❌ Could not generate AI plan: {e}")
+
+    if st.session_state.ai_plan:
+        plan_response = st.session_state.ai_plan
+        plan = plan_response.get("plan", {})
+        suggested_tasks = plan.get("suggested_tasks", [])
+        validation = plan_response.get("validation", {})
+
+        source = plan_response.get("source", "unknown")
+        st.markdown(f"**Model Source:** `{source}`")
+        st.markdown(f"**Plan Summary:** {plan.get('summary', 'No summary provided.')} ")
+
+        if validation:
+            val_col1, val_col2, val_col3 = st.columns(3)
+            with val_col1:
+                st.metric("Validation Score", validation.get("score", 0.0))
+            with val_col2:
+                st.metric("Validation Passed", "Yes" if validation.get("passed") else "No")
+            with val_col3:
+                st.metric("Suggested Tasks", len(suggested_tasks))
+
+            for err in validation.get("errors", []):
+                st.error(f"Validation error: {err}")
+            for warn in validation.get("warnings", []):
+                st.warning(f"Validation warning: {warn}")
+
+        if suggested_tasks:
+            st.markdown("### Suggested AI Tasks")
+            task_rows = []
+            for task in suggested_tasks:
+                task_rows.append(
+                    {
+                        "Type": task.get("task_type", ""),
+                        "Priority": task.get("priority", 0),
+                        "Frequency": task.get("frequency", ""),
+                        "Suggested Time": task.get("suggested_time", ""),
+                        "Confidence": task.get("confidence", 0.0),
+                        "Description": task.get("description", ""),
+                    }
+                )
+            st.table(task_rows)
+
+            if st.button("Add AI Tasks to Schedule"):
+                added = 0
+                now = datetime.now()
+                for idx, task in enumerate(suggested_tasks):
+                    due_time = parse_suggested_time(task.get("suggested_time", ""))
+                    due_datetime = datetime.combine(now.date(), due_time) + timedelta(minutes=idx * 15)
+
+                    new_task = Task(
+                        task_id=f"task_{len(st.session_state.scheduler.tasks) + 1:03d}",
+                        task_type=map_ai_task_to_tasktype(task.get("task_type", "appointment")),
+                        pet=ai_pet,
+                        due_time=due_datetime,
+                        priority=max(1, min(5, int(task.get("priority", 3)))),
+                        description=task.get("description", "AI-generated cat care task"),
+                        completed=False,
+                        recurrence=recurrence_from_frequency(task.get("frequency", "")),
+                    )
+                    st.session_state.scheduler.add_task(new_task)
+                    added += 1
+
+                st.success(f"✅ Added {added} AI-generated tasks to the schedule.")
+                st.rerun()
+else:
+    st.info("Initialize owner and add at least one cat to use AI planning.")
 
 st.divider()
 
