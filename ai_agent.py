@@ -2,7 +2,7 @@
 AI Task Planning Agent for PawPal+ Cat Care System
 
 This module implements the agentic workflow that uses retrieved cat care
-knowledge to generate structured task recommendations with Google Gemini.
+knowledge to generate structured task recommendations with Google Gemma.
 It includes a deterministic fallback so the project remains reproducible
 when the API key is unavailable.
 """
@@ -12,13 +12,13 @@ from __future__ import annotations
 import json
 import logging
 import os
-import re
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-import google.generativeai as genai
 from dotenv import load_dotenv
+from google import genai
+from google.genai import types
 from pydantic import BaseModel, Field, ValidationError
 
 from ai_validator import PlanValidator
@@ -32,7 +32,7 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 
-DEFAULT_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+DEFAULT_MODEL = os.getenv("GEMINI_MODEL", "gemma-3-1b-it")
 
 
 class SuggestedTask(BaseModel):
@@ -68,7 +68,7 @@ class CatProfile:
 
 
 class CatTaskPlanningAgent:
-    """Plans cat care tasks using retrieved knowledge and Google Gemini."""
+    """Plans cat care tasks using retrieved knowledge and Google Gemma."""
 
     def __init__(
         self,
@@ -80,7 +80,9 @@ class CatTaskPlanningAgent:
         self.model = model
         api_key = os.getenv("GOOGLE_API_KEY")
         if api_key:
-            genai.configure(api_key=api_key)
+            self.client = genai.Client(api_key=api_key)
+        else:
+            self.client = None
         logger.info("CatTaskPlanningAgent initialized with model %s", self.model)
 
     def create_plan(self, profile: CatProfile) -> Dict[str, Any]:
@@ -161,10 +163,9 @@ class CatTaskPlanningAgent:
             raise ValueError("Gemini returned an empty response body.")
 
         try:
-            json_text = self._extract_json_text(text)
             logger.debug("Gemini raw response: %s", text)
-            return json.loads(json_text)
-        except (json.JSONDecodeError, ValueError):
+            return json.loads(text)
+        except json.JSONDecodeError:
             logger.warning("Initial Gemini parse failed; retrying with stricter JSON-only prompt")
             retry_prompt = (
                 prompt
@@ -173,71 +174,29 @@ class CatTaskPlanningAgent:
             retry_text = self._request_gemini(retry_prompt)
             if not retry_text or not retry_text.strip():
                 raise ValueError("Gemini retry returned an empty response body.")
-            json_text = self._extract_json_text(retry_text)
             logger.debug("Gemini retry raw response: %s", retry_text)
-            return json.loads(json_text)
+            return json.loads(retry_text)
 
     def _request_gemini(self, prompt: str) -> str:
         """Send a single request to Gemini and return response text."""
-        model = genai.GenerativeModel(self.model)
-        response = model.generate_content(
-            prompt,
-            generation_config=genai.types.GenerationConfig(
+        if self.client is None:
+            raise ValueError("GOOGLE_API_KEY is not configured.")
+
+        response = self.client.models.generate_content(
+            model=self.model,
+            contents=prompt,
+            config=types.GenerateContentConfig(
                 temperature=0.2,
-                max_output_tokens=1200,
-                response_mime_type="application/json",
+                maxOutputTokens=4096,
+                responseMimeType="application/json",
+                responseSchema=AgentPlan.model_json_schema(),
             ),
         )
-        return self._response_text(response)
+        text = response.text or ""
+        if not text.strip():
+            raise ValueError("Gemini returned an empty response body.")
 
-    def _response_text(self, response: Any) -> str:
-        """Return text from Gemini response across SDK response shapes."""
-        text = getattr(response, "text", None)
-        if text:
-            return text
-
-        candidates = getattr(response, "candidates", None)
-        if not candidates:
-            return ""
-
-        chunks: List[str] = []
-        for candidate in candidates:
-            content = getattr(candidate, "content", None)
-            if not content:
-                continue
-            parts = getattr(content, "parts", None) or []
-            for part in parts:
-                part_text = getattr(part, "text", None)
-                if part_text:
-                    chunks.append(part_text)
-
-        return "\n".join(chunks)
-
-    def _extract_json_text(self, text: str) -> str:
-        """Extract JSON object text from raw model output.
-
-        Handles common cases where the model wraps JSON in markdown fences
-        or adds prose before/after the object.
-        """
-        cleaned = text.strip()
-
-        # Remove markdown code fences if present.
-        cleaned = re.sub(r"^```(?:json)?", "", cleaned, flags=re.IGNORECASE).strip()
-        cleaned = re.sub(r"```$", "", cleaned).strip()
-
-        # If output is already a pure JSON object/array, return it as-is.
-        if (cleaned.startswith("{") and cleaned.endswith("}")) or (
-            cleaned.startswith("[") and cleaned.endswith("]")
-        ):
-            return cleaned
-
-        # Best-effort: grab first JSON object bounds.
-        start = cleaned.find("{")
-        end = cleaned.rfind("}")
-        if start != -1 and end != -1 and end > start:
-            return cleaned[start : end + 1]
-
-        raise ValueError("Gemini response did not contain a JSON object.")
+        return text
 
     def _build_prompt(
         self,
@@ -255,11 +214,9 @@ class CatTaskPlanningAgent:
         return (
             "You are a cat care planning assistant for the PawPal+ app. "
             "Use the retrieved knowledge to generate a safe, practical care plan. "
-            "Return JSON only with this exact shape: "
-            "{\"summary\": string, \"suggested_tasks\": [" 
-            "{\"task_type\": string, \"description\": string, \"priority\": int, "
-            "\"frequency\": string, \"suggested_time\": string, \"rationale\": string, "
-            "\"confidence\": number}], \"warnings\": [string], \"next_steps\": [string]}" 
+            "Return a valid JSON object that matches the provided schema. "
+            "Keep the plan concise and return 6 to 7 suggested tasks. "
+            "Include baseline care coverage for feeding, water, and litter in the suggested tasks when appropriate. "
             "\n\nCat profile:\n"
             f"- Name: {profile.name}\n"
             f"- Breed: {profile.breed}\n"
@@ -271,14 +228,15 @@ class CatTaskPlanningAgent:
             "Rules:\n"
             "- Focus only on cat care tasks that are relevant to the retrieved knowledge.\n"
             "- Prefer indoor cat tasks like feeding, water, litter box cleaning, playtime, grooming, medication, monitoring, and vet visits.\n"
+            "- Ensure the final plan includes feeding, water, and litter coverage if the cat profile allows it.\n"
             "- Include warnings if health conditions require extra attention.\n"
             "- Keep the recommendations realistic for a single owner to complete.\n"
             "- Use confidence scores between 0 and 1.\n"
-            "- Return valid JSON only. No markdown, no commentary."
+            "- Do not include markdown fences or commentary."
         )
 
     def _parse_plan(self, raw_response: Dict[str, Any]) -> AgentPlan:
-        """Validate Claude output against the expected schema."""
+        """Validate Gemini output against the expected schema."""
         return AgentPlan.model_validate(raw_response)
 
     def _build_fallback_plan(

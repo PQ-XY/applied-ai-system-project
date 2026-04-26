@@ -6,3 +6,21 @@
 2026-04-23 17:25:18,390 | INFO | validation_timestamp | 2026-04-23T21:25:18.390824Z
 2026-04-23 17:27:00,416 | INFO | validation_result | cat=Mochi | breed=Abyssinian | passed=True | score=1.00 | errors=0 | warnings=0
 2026-04-23 17:27:00,416 | INFO | validation_timestamp | 2026-04-23T21:27:00.416487Z
+2026-04-23 17:28:41,860 | INFO | validation_result | cat=Mochi | breed=Abyssinian | passed=True | score=1.00 | errors=0 | warnings=0
+2026-04-23 17:28:41,860 | INFO | validation_timestamp | 2026-04-23T21:28:41.860842Z
+2026-04-26 14:14:51,245 | INFO | validation_result | cat=Mochi | breed=Maine Coon | passed=True | score=1.00 | errors=0 | warnings=0
+2026-04-26 14:14:51,245 | INFO | validation_timestamp | 2026-04-26T18:14:51.245824Z
+2026-04-26 14:17:54,117 | INFO | validation_result | cat=Mochi | breed=Abyssinian | passed=True | score=1.00 | errors=0 | warnings=0
+2026-04-26 14:17:54,118 | INFO | validation_timestamp | 2026-04-26T18:17:54.118071Z
+2026-04-26 14:18:26,028 | INFO | validation_result | cat=Mochi | breed=Abyssinian | passed=True | score=1.00 | errors=0 | warnings=0
+2026-04-26 14:18:26,028 | INFO | validation_timestamp | 2026-04-26T18:18:26.028662Z
+2026-04-26 14:19:28,383 | INFO | validation_result | cat=Mochi | breed=Abyssinian | passed=True | score=0.94 | errors=0 | warnings=2
+2026-04-26 14:19:28,383 | WARNING | validation_warning | cat=Mochi | Plan is missing baseline daily care categories: litter, water.
+2026-04-26 14:19:28,383 | WARNING | validation_warning | cat=Mochi | Some retrieved recommended tasks were not included: environment_control, environmental_enrichment, exercise, grooming, litter_maintenance, monitoring_breathing, playtime_intensive, training, water_refresh.
+2026-04-26 14:19:28,383 | INFO | validation_timestamp | 2026-04-26T18:19:28.383922Z
+2026-04-26 14:20:09,469 | INFO | validation_result | cat=Mochi | breed=Abyssinian | passed=True | score=0.97 | errors=0 | warnings=1
+2026-04-26 14:20:09,469 | WARNING | validation_warning | cat=Mochi | Some retrieved recommended tasks were not included: environmental_enrichment, exercise, grooming, training, vet_visits.
+2026-04-26 14:20:09,469 | INFO | validation_timestamp | 2026-04-26T18:20:09.469427Z
+2026-04-26 14:29:00,231 | INFO | validation_result | cat=Mochi | breed=Persian | passed=True | score=0.97 | errors=0 | warnings=1
+2026-04-26 14:29:00,232 | WARNING | validation_warning | cat=Mochi | Some retrieved recommended tasks were not included: medication.
+2026-04-26 14:29:00,232 | INFO | validation_timestamp | 2026-04-26T18:29:00.232193Z

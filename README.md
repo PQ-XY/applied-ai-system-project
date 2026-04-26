@@ -12,7 +12,7 @@ PawPal+ AI is a cat-focused care planning app built with Streamlit and Python. I
 
 - Rule-based scheduling for day-to-day task management
 - Retrieval-Augmented Generation (RAG) from a local cat-care knowledge base
-- Gemini-powered AI planning
+- Gemma-powered AI planning
 - A validator layer with scoring and logs
 
 The result is a practical workflow where AI suggestions are checked before being added to your schedule.
@@ -37,7 +37,7 @@ The result is a practical workflow where AI suggestions are checked before being
   - age groups
   - health conditions
   - task templates
-- **Agentic AI planning** with Gemini:
+- **Agentic AI planning** with Gemma:
   - retrieves context
   - generates structured task plan
   - returns rationale and confidence per task
@@ -168,7 +168,7 @@ streamlit run app.py
 ## Environment Variables
 
 - `GOOGLE_API_KEY`: Required for Gemini API calls
-- `GEMINI_MODEL`: Optional model override (default: `gemini-2.5-flash`)
+- `GEMINI_MODEL`: Optional model override (default: `gemma-3-1b-it`)
 
 If `GOOGLE_API_KEY` is missing, the app uses deterministic fallback planning so the project still runs.
 
