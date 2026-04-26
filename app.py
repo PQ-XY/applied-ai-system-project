@@ -99,11 +99,17 @@ if "pets" not in st.session_state:
 if "pet_counter" not in st.session_state:
     st.session_state.pet_counter = 0
 
+if "task_counter" not in st.session_state:
+    st.session_state.task_counter = 0
+
 if "ai_agent" not in st.session_state:
     st.session_state.ai_agent = None
 
 if "ai_plan" not in st.session_state:
     st.session_state.ai_plan = None
+
+if "manual_task_time" not in st.session_state:
+    st.session_state.manual_task_time = datetime.now().replace(second=0, microsecond=0).time()
 
 # Owner Setup
 st.subheader("👤 Owner Information")
@@ -281,9 +287,10 @@ if st.session_state.owner and st.session_state.pets:
                 for idx, task in enumerate(suggested_tasks):
                     due_time = parse_suggested_time(task.get("suggested_time", ""))
                     due_datetime = datetime.combine(now.date(), due_time) + timedelta(minutes=idx * 15)
+                    st.session_state.task_counter += 1
 
                     new_task = Task(
-                        task_id=f"task_{len(st.session_state.scheduler.tasks) + 1:03d}",
+                        task_id=f"task_{st.session_state.task_counter:03d}",
                         task_type=map_ai_task_to_tasktype(task.get("task_type", "appointment")),
                         pet=ai_pet,
                         due_time=due_datetime,
@@ -324,14 +331,19 @@ if st.session_state.owner and st.session_state.pets:
         task_description = st.text_input("Task description", value="Feed cat")
     
     with col2:
-        task_time = st.time_input("Time", value=datetime.now().time())
+        task_time = st.time_input(
+            "Time",
+            value=st.session_state.manual_task_time,
+            key="manual_task_time",
+        )
         task_priority = st.slider("Priority (1=Low, 5=High)", min_value=1, max_value=5, value=3)
     
     if st.button("Schedule Task"):
         due_datetime = datetime.combine(datetime.now().date(), task_time)
+        st.session_state.task_counter += 1
         
         task = Task(
-            task_id=f"task_{len(st.session_state.scheduler.tasks) + 1:03d}",
+            task_id=f"task_{st.session_state.task_counter:03d}",
             task_type=TaskType(task_type),
             pet=selected_pet,
             due_time=due_datetime,
