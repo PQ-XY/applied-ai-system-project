@@ -105,6 +105,9 @@ if "ai_agent" not in st.session_state:
 if "ai_plan" not in st.session_state:
     st.session_state.ai_plan = None
 
+if "ai_plan_id" not in st.session_state:
+    st.session_state.ai_plan_id = 0
+
 if "manual_task_time" not in st.session_state:
     st.session_state.manual_task_time = datetime.now().replace(second=0, microsecond=0).time()
 
@@ -234,6 +237,7 @@ if st.session_state.owner and st.session_state.pets:
             )
 
             st.session_state.ai_plan = st.session_state.ai_agent.create_plan(profile)
+            st.session_state.ai_plan_id += 1
             st.success("✅ AI plan generated successfully.")
         except Exception as e:
             st.error(f"❌ Could not generate AI plan: {e}")
@@ -277,29 +281,43 @@ if st.session_state.owner and st.session_state.pets:
                     }
                 )
             st.table(task_rows)
+            st.markdown("#### Select Tasks to Add")
+            selected_tasks = []
+            for idx, task in enumerate(suggested_tasks):
+                checkbox_key = f"ai_task_select_{st.session_state.ai_plan_id}_{idx}"
+                label = (
+                    f"{task.get('task_type', 'Task')} | "
+                    f"{task.get('suggested_time', 'Flexible')} | "
+                    f"P{task.get('priority', 3)}"
+                )
+                if st.checkbox(label, value=True, key=checkbox_key):
+                    selected_tasks.append((idx, task))
 
-            if st.button("Add AI Tasks to Schedule"):
-                added = 0
-                now = datetime.now()
-                for idx, task in enumerate(suggested_tasks):
-                    due_time = parse_suggested_time(task.get("suggested_time", ""))
-                    due_datetime = datetime.combine(now.date(), due_time) + timedelta(minutes=idx * 15)
+            if st.button("Add Selected AI Tasks"):
+                if not selected_tasks:
+                    st.warning("Please select at least one AI task to add.")
+                else:
+                    added = 0
+                    now = datetime.now()
+                    for idx, task in selected_tasks:
+                        due_time = parse_suggested_time(task.get("suggested_time", ""))
+                        due_datetime = datetime.combine(now.date(), due_time) + timedelta(minutes=idx * 15)
 
-                    new_task = Task(
-                        task_id=st.session_state.scheduler.generate_task_id(),
-                        task_type=map_ai_task_to_tasktype(task.get("task_type", "appointment")),
-                        pet=ai_pet,
-                        due_time=due_datetime,
-                        priority=max(1, min(5, int(task.get("priority", 3)))),
-                        description=task.get("description", "AI-generated cat care task"),
-                        completed=False,
-                        recurrence=recurrence_from_frequency(task.get("frequency", "")),
-                    )
-                    st.session_state.scheduler.add_task(new_task)
-                    added += 1
+                        new_task = Task(
+                            task_id=st.session_state.scheduler.generate_task_id(),
+                            task_type=map_ai_task_to_tasktype(task.get("task_type", "appointment")),
+                            pet=ai_pet,
+                            due_time=due_datetime,
+                            priority=max(1, min(5, int(task.get("priority", 3)))),
+                            description=task.get("description", "AI-generated cat care task"),
+                            completed=False,
+                            recurrence=recurrence_from_frequency(task.get("frequency", "")),
+                        )
+                        st.session_state.scheduler.add_task(new_task)
+                        added += 1
 
-                st.success(f"✅ Added {added} AI-generated tasks to the schedule.")
-                st.rerun()
+                    st.success(f"✅ Added {added} selected AI task(s) to the schedule.")
+                    st.rerun()
 else:
     st.info("Initialize owner and add at least one cat to use AI planning.")
 
