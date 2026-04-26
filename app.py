@@ -99,9 +99,6 @@ if "pets" not in st.session_state:
 if "pet_counter" not in st.session_state:
     st.session_state.pet_counter = 0
 
-if "task_counter" not in st.session_state:
-    st.session_state.task_counter = 0
-
 if "ai_agent" not in st.session_state:
     st.session_state.ai_agent = None
 
@@ -287,10 +284,9 @@ if st.session_state.owner and st.session_state.pets:
                 for idx, task in enumerate(suggested_tasks):
                     due_time = parse_suggested_time(task.get("suggested_time", ""))
                     due_datetime = datetime.combine(now.date(), due_time) + timedelta(minutes=idx * 15)
-                    st.session_state.task_counter += 1
 
                     new_task = Task(
-                        task_id=f"task_{st.session_state.task_counter:03d}",
+                        task_id=st.session_state.scheduler.generate_task_id(),
                         task_type=map_ai_task_to_tasktype(task.get("task_type", "appointment")),
                         pet=ai_pet,
                         due_time=due_datetime,
@@ -340,10 +336,9 @@ if st.session_state.owner and st.session_state.pets:
     
     if st.button("Schedule Task"):
         due_datetime = datetime.combine(datetime.now().date(), task_time)
-        st.session_state.task_counter += 1
-        
+
         task = Task(
-            task_id=f"task_{st.session_state.task_counter:03d}",
+            task_id=st.session_state.scheduler.generate_task_id(),
             task_type=TaskType(task_type),
             pet=selected_pet,
             due_time=due_datetime,
@@ -420,7 +415,7 @@ if st.session_state.owner and st.session_state.pets:
         if filtered_tasks:
             st.markdown(f"**Found {len(filtered_tasks)} task(s)**")
             
-            for task in filtered_tasks:
+            for idx, task in enumerate(filtered_tasks):
                 with st.expander(
                     f"{'✅' if task.completed else '⏳'} {task.pet.name} - {task.task_type.value.upper()} at {task.due_time.strftime('%H:%M')}"
                 ):
@@ -433,6 +428,7 @@ if st.session_state.owner and st.session_state.pets:
                     with col2:
                         st.write(f"**Priority:** {'⭐' * task.priority}")
                         st.write(f"**Status:** {'✅ Completed' if task.completed else '⏳ Pending'}")
+                        st.caption(f"Task ID: {task.task_id}")
                     
                     with col3:
                         if not task.completed:
@@ -440,6 +436,14 @@ if st.session_state.owner and st.session_state.pets:
                                 task.mark_complete(st.session_state.scheduler)
                                 st.success(f"Task marked complete! {'📌 Next occurrence created.' if task.recurrence else ''}")
                                 st.rerun()
+
+                        if st.button("🗑 Remove Task", key=f"remove_{task.task_id}_{idx}"):
+                            removed = st.session_state.scheduler.remove_task(task.task_id)
+                            if removed:
+                                st.success(f"Task {task.task_id} removed.")
+                            else:
+                                st.warning(f"Task {task.task_id} was not found.")
+                            st.rerun()
         else:
             st.info("No tasks match your filters.")
         

@@ -141,6 +141,18 @@ class Scheduler:
         """Add a new task to the scheduler"""
         self.tasks.append(task)
 
+    def generate_task_id(self) -> str:
+        """Generate a task ID that does not collide with active or completed tasks."""
+        existing_ids = {task.task_id for task in self.tasks}
+        existing_ids.update(task.task_id for task in self.completed_tasks)
+
+        next_index = 1
+        while True:
+            candidate = f"task_{next_index:03d}"
+            if candidate not in existing_ids:
+                return candidate
+            next_index += 1
+
     def sort_by_time(self) -> List[Task]:
         """Sort all active tasks by due_time in chronological order"""
         return sorted(self.tasks, key=lambda task: task.due_time)
@@ -238,9 +250,18 @@ class Scheduler:
         
         return warnings
 
-    def remove_task(self, task_id: str) -> None:
-        """Remove a task from the scheduler"""
-        pass
+    def remove_task(self, task_id: str) -> bool:
+        """Remove a task by ID from active/completed collections.
+
+        Returns True if at least one task was removed, otherwise False.
+        """
+        before_active = len(self.tasks)
+        before_completed = len(self.completed_tasks)
+
+        self.tasks = [task for task in self.tasks if task.task_id != task_id]
+        self.completed_tasks = [task for task in self.completed_tasks if task.task_id != task_id]
+
+        return (len(self.tasks) < before_active) or (len(self.completed_tasks) < before_completed)
 
     def prioritize_tasks(self) -> List[Task]:
         """Organize and prioritize all active tasks"""
