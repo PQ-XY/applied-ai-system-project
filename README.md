@@ -23,12 +23,14 @@ The result is a practical workflow where AI suggestions are checked before being
 
 ### Core App Features
 
-- Add owner and pets
+- Add owner and cats
 - Schedule manual tasks with priority and time
 - Sort tasks chronologically
-- Filter by pet and status
+- Filter by cat and status (always time-sorted)
 - Detect scheduling conflicts
 - Mark tasks complete and auto-create recurring tasks
+- Remove tasks from schedule
+- Reschedule tasks from the UI with conflict-aware time proposal
 
 ### AI Features
 
@@ -49,7 +51,7 @@ The result is a practical workflow where AI suggestions are checked before being
   - writes validator logs to `logs/ai_validator.log`
 - **Human-in-the-loop control**:
   - user reviews plan, warnings, and score
-  - user chooses whether to add suggested tasks
+  - user chooses exactly which suggested tasks to add (not all-or-nothing)
 
 ---
 
@@ -131,8 +133,8 @@ cp .env.example .env
 Then edit `.env`:
 
 ```env
-GOOGLE_API_KEY=your_google_api_key_here
-GEMINI_MODEL=gemini-2.0-flash
+GOOGLE_API_KEY=your_google_generativeai_key_here
+GEMINI_MODEL=gemma-3-1b-it
 ```
 
 ### 4. Run tests
@@ -161,7 +163,17 @@ streamlit run app.py
    - validation score/pass status
    - validation warnings/errors
    - suggested tasks table
-6. Click **Add AI Tasks to Schedule** to apply approved tasks
+6. Select the suggested tasks you want, then click **Add Selected AI Tasks**
+
+---
+
+## Task Actions in the UI
+
+In the task cards under scheduling:
+
+- **Mark Complete**: marks task complete and creates next occurrence for recurring tasks
+- **Reschedule**: pick a new time and submit; if it conflicts, system auto-shifts to the next available 15-minute slot
+- **Remove Task**: deletes the task by task ID
 
 ---
 
@@ -206,6 +218,7 @@ Current automated tests in `tests/test_pawpal.py` cover scheduler logic from the
 - Suggested times are parsed with best-effort rules
 - Validation warnings do not hard-block adding tasks
 - Knowledge base is local JSON (no vector DB yet)
+- State is in-memory during runtime (no persistent database storage)
 
 ---
 
