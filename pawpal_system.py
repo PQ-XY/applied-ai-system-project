@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List
 from enum import Enum
 
@@ -166,8 +166,8 @@ class Scheduler:
         
         if completed is not None:
             filtered = [task for task in filtered if task.completed == completed]
-        
-        return filtered
+
+        return sorted(filtered, key=lambda task: task.due_time)
 
     def create_next_occurrence(self, task: Task) -> None:
         """Create a new task for the next occurrence of a recurring task"""
@@ -280,8 +280,40 @@ class Scheduler:
         pass
 
     def reschedule_task(self, task_id: str, new_time: datetime) -> None:
-        """Reschedule an existing task to a new time"""
-        pass
+        """Reschedule an existing task.
+
+        If the requested time conflicts with another active task, this method
+        proposes the next available 15-minute slot and applies it.
+        """
+        target_task = next((task for task in self.tasks if task.task_id == task_id), None)
+        if target_task is None:
+            raise ValueError(f"Task '{task_id}' not found.")
+
+        if target_task.completed:
+            raise ValueError(f"Task '{task_id}' is completed and cannot be rescheduled.")
+
+        candidate_time = new_time
+
+        # Search up to 24 hours in 15-minute steps for the next conflict-free slot.
+        max_attempts = int((24 * 60) / 15)
+        attempts = 0
+        while attempts <= max_attempts:
+            has_conflict = any(
+                other.task_id != task_id
+                and not other.completed
+                and other.due_time == candidate_time
+                for other in self.tasks
+            )
+            if not has_conflict:
+                target_task.due_time = candidate_time
+                return
+
+            candidate_time += timedelta(minutes=15)
+            attempts += 1
+
+        raise RuntimeError(
+            f"Could not find an available time to reschedule task '{task_id}' within 24 hours."
+        )
 
 
 class Activity:

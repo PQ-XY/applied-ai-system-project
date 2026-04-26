@@ -401,16 +401,18 @@ if st.session_state.owner and st.session_state.pets:
                 key="filter_status_select"
             )
         
-        # Apply filters using Scheduler.filter_tasks()
-        filtered_tasks = st.session_state.scheduler.tasks
-        
-        if filter_pet != "All":
-            filtered_tasks = st.session_state.scheduler.filter_tasks(pet_name=filter_pet)
-        
+        # Apply filters using Scheduler.filter_tasks() to keep results time-sorted.
+        pet_filter = None if filter_pet == "All" else filter_pet
+        status_filter = None
         if filter_status == "Pending":
-            filtered_tasks = [t for t in filtered_tasks if not t.completed]
+            status_filter = False
         elif filter_status == "Completed":
-            filtered_tasks = [t for t in filtered_tasks if t.completed]
+            status_filter = True
+
+        filtered_tasks = st.session_state.scheduler.filter_tasks(
+            pet_name=pet_filter,
+            completed=status_filter,
+        )
         
         if filtered_tasks:
             st.markdown(f"**Found {len(filtered_tasks)} task(s)**")
@@ -435,6 +437,39 @@ if st.session_state.owner and st.session_state.pets:
                             if st.button("✓ Mark Complete", key=f"complete_{task.task_id}"):
                                 task.mark_complete(st.session_state.scheduler)
                                 st.success(f"Task marked complete! {'📌 Next occurrence created.' if task.recurrence else ''}")
+                                st.rerun()
+
+                            with st.form(key=f"reschedule_form_{task.task_id}_{idx}"):
+                                new_task_time = st.time_input(
+                                    "New time",
+                                    value=task.due_time.time(),
+                                    key=f"resched_time_{task.task_id}_{idx}",
+                                )
+                                reschedule_submitted = st.form_submit_button("🕒 Reschedule")
+
+                            if reschedule_submitted:
+                                requested_time = datetime.combine(task.due_time.date(), new_task_time)
+                                old_time = task.due_time
+                                try:
+                                    st.session_state.scheduler.reschedule_task(task.task_id, requested_time)
+                                    updated_task = next(
+                                        (t for t in st.session_state.scheduler.tasks if t.task_id == task.task_id),
+                                        None,
+                                    )
+                                    final_time = updated_task.due_time if updated_task else requested_time
+                                    if final_time != requested_time:
+                                        st.warning(
+                                            f"Conflict at {requested_time.strftime('%H:%M')}. "
+                                            f"Moved to {final_time.strftime('%H:%M')}"
+                                        )
+                                    else:
+                                        st.success(
+                                            f"Task rescheduled from {old_time.strftime('%H:%M')} to {final_time.strftime('%H:%M')}"
+                                        )
+                                except ValueError as exc:
+                                    st.error(f"Could not reschedule task: {exc}")
+                                except RuntimeError as exc:
+                                    st.error(f"Could not find an available time: {exc}")
                                 st.rerun()
 
                         if st.button("🗑 Remove Task", key=f"remove_{task.task_id}_{idx}"):
