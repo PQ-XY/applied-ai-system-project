@@ -72,9 +72,9 @@ def load_breed_options():
             "Siamese",
         ]
 
-st.set_page_config(page_title="PawPal+", page_icon="🐾", layout="wide")
+st.set_page_config(page_title="PawPal+", page_icon="🐱", layout="wide")
 
-st.title("🐾 PawPal+")
+st.title("🐱 PawPal+")
 
 st.markdown(
     """
