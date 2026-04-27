@@ -135,7 +135,7 @@ Then edit `.env`:
 
 ```env
 GOOGLE_API_KEY=your_google_generativeai_key_here
-GEMINI_MODEL=gemma-3-1b-it
+GEMINI_MODEL=gemini-2.5-flash
 ```
 
 ### 4. Run tests
@@ -181,7 +181,7 @@ In the task cards under scheduling:
 ## Environment Variables
 
 - `GOOGLE_API_KEY`: Required for Gemini API calls
-- `GEMINI_MODEL`: Optional model override (default: `gemma-3-1b-it`)
+- `GEMINI_MODEL`: Optional model override (default: `gemini-2.5-flash`)
 
 If `GOOGLE_API_KEY` is missing, the app uses deterministic fallback planning so the project still runs.
 

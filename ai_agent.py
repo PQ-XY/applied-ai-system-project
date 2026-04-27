@@ -32,7 +32,7 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 
-DEFAULT_MODEL = os.getenv("GEMINI_MODEL", "gemma-3-1b-it")
+DEFAULT_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
 
 class SuggestedTask(BaseModel):
