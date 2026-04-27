@@ -24,8 +24,6 @@ The result is a practical workflow where AI suggestions are checked before being
 
 Add your Loom-generated GIF URL below to show a quick product walkthrough directly in the README.
 
-![PawPal+ Demo GIF](PawPal AI Cat Care Schedule Planner Demo 🐾 - Watch Video)
-
 Loom video link: https://www.loom.com/share/88cdb91789b6442193d4a1d499d4472b
 
 ---
