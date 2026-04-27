@@ -16,6 +16,7 @@ PawPal+ AI is a cat-focused care planning app built with Streamlit and Python. I
 - A validator layer with scoring and logs
 
 The result is a practical workflow where AI suggestions are checked before being added to your schedule.
+![homepage](/assets/homepage.png)
 
 ---
 
