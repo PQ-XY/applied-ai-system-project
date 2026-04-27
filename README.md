@@ -20,6 +20,16 @@ The result is a practical workflow where AI suggestions are checked before being
 
 ---
 
+## Loom Demo GIF
+
+Add your Loom-generated GIF URL below to show a quick product walkthrough directly in the README.
+
+![PawPal+ Demo GIF](https://www.loom.com/share/88cdb91789b6442193d4a1d499d4472b)
+
+Loom video link: https://www.loom.com/share/REPLACE_WITH_YOUR_VIDEO_ID
+
+---
+
 ## What Is Implemented
 
 ### Core App Features
